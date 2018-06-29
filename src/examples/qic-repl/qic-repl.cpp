@@ -1,21 +1,20 @@
 #include <QTextStream>
-#include "qicruntime.h"
+#include <qicruntime.h>
 
-int main(int argc, const char *argv[])
+int main(int argc, char *argv[])
 {
     qicRuntime rt;
-    //rt.setDebug(true);
+    //
+    // NOTE: Configure the build environment according to your system here.
+    //
     //rt.loadEnv("C:/projects/qt-interactive-coding/env3.txt");
     //rt.setQtLibs({ "core" });
+    rt.setQtConfig({ "debug", "exceptions_off", "rtti_off" });
     rt.setIncludePath({ "C:/projects/qt-interactive-coding/src/qicruntime" });
 
+    // add some context variables
     int x = 961;
     rt.addVar(&x, "x", nullptr);
-
-    QTextStream out(stdout);
-    QTextStream in(stdin);
-
-    out << "REPL: Type C++ code here, type 'go' to compile, or 'quit' to exit." << endl;
 
     QString boilerplate = "#include <qicentry.h>\n"
                           "#include <qiccontext.h>\n"
@@ -24,8 +23,13 @@ int main(int argc, const char *argv[])
                           "}\n";
     QString code;
 
+    QTextStream out(stdout);
+    QTextStream in(stdin);
+
+    out << "REPL: Type C++ code here, then type 'go' to compile and run, or 'quit' to exit." << endl;
+
     //
-    // REPL
+    // REPL - well, not exactly a REPL, rather a Read-Compile-Execute-Loop
     //
     while (true) {
         QString line = in.readLine();

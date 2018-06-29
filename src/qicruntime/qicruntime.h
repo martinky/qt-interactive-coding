@@ -27,9 +27,10 @@ class qicRuntimePrivate;
 
     Use the various setters to control the build environment. You can override
     environment variables, path to the `qmake` and `make` programs, add defines,
-    include paths and linked libraries. By default, the compiled library links
-    the QtCore library. You can override this or link with other Qt libraries
-    using setQtLibs(). Use setDebug(true) to produce a debug build.
+    include paths and linked libraries. By default, the compiled library does
+    not link with Qt. You can override and link with Qt libraries using
+    setQtLibs(). Use setQtConfig() to configure additional Qt features (debug
+    build, exceptions, rtti).
 
     The loadEnv() method comes in handy, if you need to replicate a build
     environment that is not your default command line environment. It loads a
@@ -57,18 +58,18 @@ public:
     void loadEnv(QString path);
     void setQmake(QString path);
     void setMake(QString path);
-    void setDebug(bool debug);
     void setDefines(QStringList defines);
     void setIncludePath(QStringList dirs);
     void setLibs(QStringList libs);
     void setQtLibs(QStringList qtlibs);
+    void setQtConfig(QStringList qtconf);
 
     // ctx
 
     void *getVar(const char *name) override;
     void *addVar(void *ptr, const char *name, void(*deleter)(void*)) override;
 
-    void debug(const char *str) override;
+    void debug(const char *fmt, ...) override;
 
 private:
     bool compile(QString src);

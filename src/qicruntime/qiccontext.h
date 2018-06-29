@@ -29,7 +29,7 @@ struct qicContext
     virtual void *getVar(const char *name) = 0;
     virtual void *addVar(void *ptr, const char *name, void(*deleter)(void*)) = 0;
 
-    virtual void debug(const char *str) = 0;
+    virtual void debug(const char *fmt, ...) = 0;
 };
 
 #endif // QICCONTEXT_H

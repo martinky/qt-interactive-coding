@@ -27,11 +27,12 @@ public:
     QTemporaryDir dir;
     QProcessEnvironment env;
     QString qmake, make;
-    QStringList defines;
-    QStringList include_path;
-    QStringList qtlibs;
-    QStringList libs;
-    bool debug = false;
+    // qmake project variables
+    QStringList defines;        // DEFINES
+    QStringList include_path;   // INCLUDEPATH
+    QStringList qtlibs;         // QT
+    QStringList qtconf;         // CONFIG
+    QStringList libs;           // LIBS
 
     // As libs are compiled and loaded, they are appended to this list. The
     // last one is the current/last executed lib. Each lib can add variables
@@ -53,9 +54,6 @@ public:
 #else
         make = "make";
 #endif
-
-        // qmake project properties
-        qtlibs << "core";
     }
 
     ~qicRuntimePrivate()
@@ -128,7 +126,7 @@ public:
     QString getLib() const
     {
 #ifdef Q_OS_WIN
-        QString libn = debug ? "debug/a%1.dll" : "release/a%1.dll";
+        QString libn = qtconf.contains("debug") ? "debug/a%1.dll" : "release/a%1.dll";
 #else
         QString libn = "liba%1.so";
 #endif
@@ -236,11 +234,6 @@ void qicRuntime::setMake(QString path)
     p->make = path;
 }
 
-void qicRuntime::setDebug(bool debug)
-{
-    p->debug = debug;
-}
-
 void qicRuntime::setDefines(QStringList defines)
 {
     p->defines = defines;
@@ -261,6 +254,11 @@ void qicRuntime::setQtLibs(QStringList qtlibs)
     p->qtlibs = qtlibs;
 }
 
+void qicRuntime::setQtConfig(QStringList qtconf)
+{
+    p->qtconf = qtconf;
+}
+
 void *qicRuntime::getVar(const char *name)
 {
     return p->getVar(name);
@@ -271,9 +269,14 @@ void *qicRuntime::addVar(void *ptr, const char *name, void (*deleter)(void *))
     return p->addVar(ptr, name, deleter);
 }
 
-void qicRuntime::debug(const char *str)
+void qicRuntime::debug(const char *fmt, ...)
 {
-    qDebug("qicRuntime: %s", str);
+    char buff[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buff, 1024, fmt, args);
+    va_end(args);
+    qDebug(buff);
 }
 
 bool qicRuntime::compile(QString src)
@@ -309,8 +312,9 @@ bool qicRuntime::compile(QString src)
     {
         QTextStream tpro(&fpro);
         tpro << "TEMPLATE = lib" << endl;
-        tpro << "SOURCES = " << fncpp << endl;
         tpro << "QT = " << p->qtlibs.join(QChar(' ')) << endl;
+        tpro << "CONFIG += " << p->qtconf.join(QChar(' ')) << endl;
+        tpro << "SOURCES = " << fncpp << endl;
         for (QString def: p->defines) {
             tpro << "DEFINES += " << def << endl;
         }
@@ -328,14 +332,10 @@ bool qicRuntime::compile(QString src)
 //        qDebug("[env]   %s=%s", qPrintable(k), qPrintable(v));
 //    }
 
-    QStringList qmake_args;
-    if (p->debug) qmake_args << "CONFIG+=debug";
-    qmake_args << fnpro;
-
     QProcess pqmake;
     pqmake.setWorkingDirectory(p->dir.path());
     pqmake.setProcessEnvironment(p->env);
-    pqmake.start(p->qmake, qmake_args);
+    pqmake.start(p->qmake, { fnpro });
     pqmake.waitForFinished();
     while (!pqmake.atEnd()) {
         QByteArray s = pqmake.readLine().trimmed();
