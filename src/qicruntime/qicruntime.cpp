@@ -5,6 +5,7 @@
 #include <QLibrary>
 #include <QProcess>
 #include "qicruntime.h"
+#include "qiccontext.h"
 
 
 struct qicVar
@@ -21,6 +22,70 @@ struct qicFrame
 };
 
 
+struct qicContextImpl : public qicContext
+{
+    // Stack of context frames. A frame holds the library that contains the
+    // runtime-compiled code and any variables this code may have registered.
+    std::vector<qicFrame> frames;
+
+    qicContextImpl()
+    {
+        // push one empty frame to hold user defined global variables
+        frames.push_back(qicFrame());
+    }
+
+    ~qicContextImpl()
+    {
+        // unload libs in reverse order
+        for (auto fit = frames.rbegin(); fit != frames.rend(); ++fit) {
+            // destroy lib vars in reverse order before unload
+            for (auto vit = fit->vars.rbegin(); vit != fit->vars.rend(); ++vit) {
+                ::free(vit->name);
+                if (vit->deleter) {
+                    vit->deleter(vit->ptr);
+                }
+            }
+            if (fit->lib) {
+                fit->lib->unload();
+                delete fit->lib;
+            }
+        }
+    }
+
+    void *get(const char *name) override
+    {
+        // search context frames and their variables in reverse order - most
+        // recently set variables override previously set variables
+        for (auto fit = frames.rbegin(); fit != frames.rend(); ++fit) {
+            for (auto vit = fit->vars.rbegin(); vit != fit->vars.rend(); ++vit) {
+                if (0 == ::strcmp(name, vit->name)) {
+                    return vit->ptr;
+                }
+            }
+        }
+
+        return nullptr;
+    }
+
+    void *set(void *ptr, const char *name, void(*deleter)(void*)) override
+    {
+        Q_ASSERT(frames.empty() == false);
+        frames.back().vars.push_back({ ptr, ::strdup(name), deleter });
+        return ptr;
+    }
+
+    void debug(const char *fmt, ...) override
+    {
+        char buff[1024];
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(buff, 1024, fmt, args);
+        va_end(args);
+        qDebug(buff);
+    }
+};
+
+
 class qicRuntimePrivate
 {
 public:
@@ -34,15 +99,7 @@ public:
     QStringList qtconf;         // CONFIG
     QStringList libs;           // LIBS
 
-    // As libs are compiled and loaded, they are appended to this list. The
-    // last one is the current/last executed lib. Each lib can add variables
-    // that will be persisted and available to subsequently compiled libs.
-    // A lib registers a deleter with every variable. Variables defined by a
-    // lib are destroyed before the lib is unloaded by calling the registered
-    // deleter. Libs and variables are unloaded and destroyed in reverse order.
-    std::vector<qicFrame> frames;
-    // User-registered vars with the runtime. These are not deleted by the RT.
-    std::vector<qicVar> globals;
+    qicContextImpl ctx;
 
     qicRuntimePrivate()
     {
@@ -54,53 +111,6 @@ public:
 #else
         make = "make";
 #endif
-    }
-
-    ~qicRuntimePrivate()
-    {
-        for (auto fit = frames.rbegin(); fit != frames.rend(); ++fit) {
-            // unload libs in reverse order
-            for (auto vit = fit->vars.rbegin(); vit != fit->vars.rend(); ++vit) {
-                // destroy vars in reverse order
-                ::free(vit->name);
-                if (vit->deleter) {
-                    vit->deleter(vit->ptr);
-                }
-            }
-            fit->lib->unload();
-            delete fit->lib;
-        }
-    }
-
-    void *getVar(const char *name) const
-    {
-        // search lib frames and their variables in reverse order
-        for (auto fit = frames.rbegin(); fit != frames.rend(); ++fit) {
-            for (auto vit = fit->vars.rbegin(); vit != fit->vars.rend(); ++vit) {
-                if (0 == ::strcmp(name, vit->name)) {
-                    return vit->ptr;
-                }
-            }
-        }
-
-        // if not found, search globals in reverse order
-        for (auto vit = globals.rbegin(); vit != globals.rend(); ++vit) {
-            if (0 == ::strcmp(name, vit->name)) {
-                return vit->ptr;
-            }
-        }
-
-        return nullptr;
-    }
-
-    void *addVar(void *ptr, const char *name, void (*deleter)(void *))
-    {
-        if (frames.empty()) {
-            globals.push_back({ ptr, ::strdup(name), deleter });
-        } else {
-            frames.back().vars.push_back({ ptr, ::strdup(name), deleter });
-        }
-        return ptr;
     }
 
     void loadEnv(QString path)
@@ -123,7 +133,7 @@ public:
         }
     }
 
-    QString getLib() const
+    QString getLibPath() const
     {
 #ifdef Q_OS_WIN
         QString libn = qtconf.contains("debug") ? "debug/a%1.dll" : "release/a%1.dll";
@@ -135,7 +145,7 @@ public:
 
     int seq() const
     {
-        return (int)frames.size();
+        return (int)ctx.frames.size();
     }
 };
 
@@ -161,7 +171,7 @@ bool qicRuntime::exec(QString source)
 
     // load library
 
-    QString lib_path = p->getLib();
+    QString lib_path = p->getLibPath();
     QLibrary *lib = new QLibrary(lib_path);
     if (!lib->load()) {
         qWarning("qicRuntime: Failed to load library %s: %s", qPrintable(lib_path), qPrintable(lib->errorString()));
@@ -184,11 +194,11 @@ bool qicRuntime::exec(QString source)
 
     qicFrame frame;
     frame.lib = lib;
-    p->frames.push_back(frame);
+    p->ctx.frames.push_back(frame);
 
     // execute
 
-    qic_entry(this);
+    qic_entry(&p->ctx);
 
     return true;
 }
@@ -259,24 +269,14 @@ void qicRuntime::setQtConfig(QStringList qtconf)
     p->qtconf = qtconf;
 }
 
-void *qicRuntime::getVar(const char *name)
+void *qicRuntime::getCtxVar(const char *name)
 {
-    return p->getVar(name);
+    return p->ctx.get(name);
 }
 
-void *qicRuntime::addVar(void *ptr, const char *name, void (*deleter)(void *))
+void *qicRuntime::setCtxVar(void *ptr, const char *name, void (*deleter)(void *))
 {
-    return p->addVar(ptr, name, deleter);
-}
-
-void qicRuntime::debug(const char *fmt, ...)
-{
-    char buff[1024];
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(buff, 1024, fmt, args);
-    va_end(args);
-    qDebug(buff);
+    return p->ctx.set(ptr, name, deleter);
 }
 
 bool qicRuntime::compile(QString src)

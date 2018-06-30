@@ -3,8 +3,6 @@
 
 #include <QString>
 
-#include "qiccontext.h"
-
 #if defined QIC_DLL
 #define QIC_EXPORT Q_DECL_EXPORT
 #else
@@ -15,6 +13,8 @@ class qicRuntimePrivate;
 
 /**
     The qicRuntime class provides the runtime build and execution environment.
+    It utilizes the locally installed Qt build system `qmake` and native build
+    toolchain.
 
     The exec() method takes a piece of C++ source code, wraps it in a shared
     library `qmake` project and builds using the installed C++ toolchain and Qt
@@ -22,8 +22,8 @@ class qicRuntimePrivate;
     function. Upon successful compilation of this code into a shared library,
     this library is loaded, and the qic_entry() function is called.
 
-    Use the addVar() method to pass data to the runtime-compiled code and
-    getVar() to retrieve data created by the runtime code.
+    Use the setCtxVar() method to pass data to the runtime-compiled code and
+    getCtxVar() to retrieve data created by the runtime code.
 
     Use the various setters to control the build environment. You can override
     environment variables, path to the `qmake` and `make` programs, add defines,
@@ -40,7 +40,7 @@ class qicRuntimePrivate;
     this, open a terminal, configure your build environment, then grab the
     output of `env` or `set` into a file and load this file using loadEnv().
  */
-class QIC_EXPORT qicRuntime : public qicContext
+class QIC_EXPORT qicRuntime
 {
 public:
     qicRuntime();
@@ -66,10 +66,8 @@ public:
 
     // ctx
 
-    void *getVar(const char *name) override;
-    void *addVar(void *ptr, const char *name, void(*deleter)(void*)) override;
-
-    void debug(const char *fmt, ...) override;
+    void *getCtxVar(const char *name);
+    void *setCtxVar(void *ptr, const char *name, void(*deleter)(void*));
 
 private:
     bool compile(QString src);

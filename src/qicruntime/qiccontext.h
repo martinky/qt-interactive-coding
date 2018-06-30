@@ -9,25 +9,25 @@
 
         extern "C" void qic_entry(qicContext *ctx);
 
-    getVar()
-        Retrieves a variable previously defined by addVar()
+    get()
+        Retrieves a variable previously stored by set().
 
-    addVar()
-        Registers a variable with the runtime. This variable will be persisted
+    set()
+        Registers a variable with the context. This variable will be persisted
         and accessible to subsequent runtime-compiled code as well as to the
         host of qicRuntime. If a deleter function is provided, it will be used
         to dispose of the variable when the library that holds the code is
-        unloaded. Do not addVar() pointers to locals defined in the scope of
-        qic_entry(). Globals and variables allocated on the heap (malloc, new)
-        are OK.
+        unloaded. Do not set() pointers to local variables defined in the scope
+        of qic_entry(). Globals and variables allocated on the heap (malloc,
+        new) are OK.
 
     debug()
         Prints a debug message.
  */
 struct qicContext
 {
-    virtual void *getVar(const char *name) = 0;
-    virtual void *addVar(void *ptr, const char *name, void(*deleter)(void*)) = 0;
+    virtual void *get(const char *name) = 0;
+    virtual void *set(void *ptr, const char *name, void(*deleter)(void*)) = 0;
 
     virtual void debug(const char *fmt, ...) = 0;
 };

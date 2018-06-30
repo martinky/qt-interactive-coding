@@ -7,14 +7,14 @@ int main(int argc, char *argv[])
     //
     // NOTE: Configure the build environment according to your system here.
     //
-    //rt.loadEnv("C:/projects/qt-interactive-coding/env3.txt");
     //rt.setQtLibs({ "core" });
-    rt.setQtConfig({ "debug", "exceptions_off", "rtti_off" });
+    rt.setQtConfig({ /*"debug",*/ "exceptions_off", "rtti_off" });
+    //rt.loadEnv("C:/projects/qt-interactive-coding/env3.txt");
     rt.setIncludePath({ "C:/projects/qt-interactive-coding/src/qicruntime" });
 
     // add some context variables
     int x = 961;
-    rt.addVar(&x, "x", nullptr);
+    rt.setCtxVar(&x, "x", nullptr);
 
     QString boilerplate = "#include <qicentry.h>\n"
                           "#include <qiccontext.h>\n"
