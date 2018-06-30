@@ -1,18 +1,25 @@
 #include <QTextStream>
 #include <qicruntime.h>
 
-int main(int argc, char *argv[])
-{
-    qicRuntime rt;
-    //
-    // NOTE: Configure the build environment according to your system here.
-    //
-    //rt.setQtLibs({ "core" });
-    rt.setQtConfig({ /*"debug",*/ "exceptions_off", "rtti_off" });
-    //rt.loadEnv("C:/projects/qt-interactive-coding/env3.txt");
-    rt.setIncludePath({ "C:/projects/qt-interactive-coding/src/qicruntime" });
+#define BASE_DIR "C:/projects/qt-interactive-coding/"
 
-    // add some context variables
+int main()
+{
+    //
+    // Configure the build environment.
+    //
+    qicRuntime rt;
+    //rt.setQtLibs({ "core" });
+#ifdef QT_DEBUG
+    // It is extremely impmortant to ensure that the runtime-compiled code
+    // links with the same version of Qt libraries and CRT library as the host
+    // application (i.e. QtCore5.dll vs. QtCore5d.dll).
+    rt.setQtConfig({ "debug" });
+#endif
+    rt.setIncludePath({ BASE_DIR "src/qicruntime" });
+    //rt.loadEnv(BASE_DIR "env3.txt");
+
+    // Add some context variables.
     int x = 961;
     rt.setCtxVar(&x, "x", nullptr);
 
@@ -29,7 +36,7 @@ int main(int argc, char *argv[])
     out << "REPL: Type C++ code here, then type 'go' to compile and run, or 'quit' to exit." << endl;
 
     //
-    // REPL - well, not exactly a REPL, rather a Read-Compile-Execute-Loop
+    // REPL - Well, not exactly a REPL, rather a Read-Compile-Execute-Loop.
     //
     while (true) {
         QString line = in.readLine();

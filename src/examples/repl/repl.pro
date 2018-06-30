@@ -5,7 +5,7 @@ QT += core
 CONFIG += console
 
 SOURCES += \
-    qic-repl.cpp
+    repl-main.cpp
 
 # library: qiccontext
 win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../../qicruntime/release/ -lqicruntime
