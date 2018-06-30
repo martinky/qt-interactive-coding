@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QFileSystemWatcher>
+#include <QThread>
 #include <QWidget>
 #include <QLabel>
 #include <qicruntime.h>
@@ -49,6 +50,14 @@ int main(int argc, char *argv[])
     watcher.addPath(watched);
 
     QObject::connect(&watcher, &QFileSystemWatcher::fileChanged, [&](){
+        qDebug("Change detected, going to recompile: %s", qPrintable(watched));
+
+        // Small workaround, because some editors save files in a "weird" way
+        // that actually deletes and replaces the file and this confuses the
+        // QFileSystemWatcher, which stops watching for subsequent changes.
+        QThread::msleep(100);
+        watcher.addPath(watched);
+
         rt.execFile(watched);
     });
 
