@@ -1,5 +1,6 @@
 #include <QTextStream>
 #include <qicruntime.h>
+#include <qiccontext.h>
 
 #define BASE_DIR "C:/projects/qt-interactive-coding/"
 
@@ -21,7 +22,7 @@ int main()
 
     // Add some context variables.
     int x = 961;
-    rt.setCtxVar(&x, "x", nullptr);
+    rt.ctx()->set(&x, "x");
 
     QString boilerplate = "#include <qicentry.h>\n"
                           "#include <qiccontext.h>\n"

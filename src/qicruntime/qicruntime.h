@@ -11,11 +11,11 @@
 
 class qicRuntimePrivate;
 
+struct qicContext;
+
 /**
     \class qicRuntime
     The qicRuntime class provides the runtime build and execution environment.
-    It utilizes the locally installed Qt build system `qmake` and native build
-    toolchain.
 
     The exec() method takes a piece of self-contained C++ source code, wraps it
     in a shared library `qmake` project and builds it using the installed C++
@@ -24,8 +24,8 @@ class qicRuntimePrivate;
     shared library, this library is loaded, and the qic_entry() function is
     resolved and called.
 
-    Use the setCtxVar() and getCtxVar() methods to exchange data with the
-    runtime-compiled code.
+    The ctx() method returns the qicContext object for exchange of data with
+    the runtime-compiled code.
 
     Use the various setters to control the build environment. You can override
     environment variables, path to the `qmake` and `make` programs, add defines,
@@ -82,15 +82,9 @@ class qicRuntimePrivate;
     the runtime code will be linked with different Qt libraries and different
     versions of the CRT runtime which will cause unpredictable fatal errors.
 
-    \fn qicRuntime::getCtxVar()
-    Returns a pointer to an object set either by the runtime-compiled code,
-    via qicContext::set() or previously set by setCtxVar().
-
-    \fn qicRuntime::setCtxVar()
-    Registers a pointer to an object with the runtime. This variable will be
-    available to the runtime-compiled code via qicContext::get(). If a \a
-    deleter is provided, the object will be disposed of when the qicRuntime is
-    destroyed.
+    \fn qicRuntime::ctx()
+    Returns pointer to qicContext that can be used to share data with the
+    runtime code.
 
     \fn qicRuntime::exec()
     Compiles and executes the provided C++ code. This method is blocking and
@@ -98,15 +92,13 @@ class qicRuntimePrivate;
     returns.
 
     \fn qicRuntime::execFile()
-    Same as exec() except the source code is loaded from the \a filename;
+    Same as exec() except the source code is read from the \a filename;
  */
 class QIC_EXPORT qicRuntime
 {
 public:
     qicRuntime();
     ~qicRuntime();
-
-    //TODO: make exec() async, return a quasi future object qicExecutable
 
     bool exec(QString source);
     bool execFile(QString filename);
@@ -124,10 +116,7 @@ public:
     void setQtLibs(QStringList qtlibs);
     void setQtConfig(QStringList qtconf);
 
-    // ctx
-
-    void *getCtxVar(const char *name);
-    void *setCtxVar(void *ptr, const char *name, void(*deleter)(void*));
+    qicContext *ctx();
 
 private:
     bool compile(QString src);

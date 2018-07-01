@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QLabel>
 #include <qicruntime.h>
+#include <qiccontext.h>
 
 #define BASE_DIR "C:/projects/qt-interactive-coding/"
 
@@ -44,7 +45,7 @@ int main(int argc, char *argv[])
     //
     // Make this widget available to the runtime-compiled code.
     //
-    rt.setCtxVar(&label, "label", nullptr);
+    rt.ctx()->set(&label, "label");
 
     QFileSystemWatcher watcher;
     watcher.addPath(watched);

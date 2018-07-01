@@ -269,14 +269,9 @@ void qicRuntime::setQtConfig(QStringList qtconf)
     p->qtconf = qtconf;
 }
 
-void *qicRuntime::getCtxVar(const char *name)
+qicContext *qicRuntime::ctx()
 {
-    return p->ctx.get(name);
-}
-
-void *qicRuntime::setCtxVar(void *ptr, const char *name, void (*deleter)(void *))
-{
-    return p->ctx.set(ptr, name, deleter);
+    return &p->ctx;
 }
 
 bool qicRuntime::compile(QString src)
