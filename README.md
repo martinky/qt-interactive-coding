@@ -5,10 +5,10 @@ License: MIT
 
 ## Summary
 
-This library provides the ability to compile and execute C++ code from within
-an application during runtime, defacto using C++ as a scripting language. This
-library is implemented using Qt and therefore makes most sense integrating into
-Qt projects.
+Simple, cross-platform library to automate the process of compilation and
+execution of C++ code from within an application during runtime. Allows to
+use C++ as a scripting language. This library is implemented using Qt and
+therefore is suitable for integrating with Qt projects.
 
 Possible uses:
 
@@ -25,12 +25,12 @@ Possible uses:
 
 ## Integration
 
-You can either build the `qicruntime.pro` as a library and link to it, or add
-it directly into your Qt project by including `qicruntime.pri`.
+You can either build and link the `qicruntime.pro` as a shared or static
+library, or add it directly into your Qt project by including `qicruntime.pri`.
 
 ## Usage
 
-Basic example of compiling and running C++ code at runtime.
+Basic example: Compiling and running C++ code at runtime.
 
 ``` c++
 #include <qicruntime.h>
@@ -40,6 +40,7 @@ int main()
     qicRuntime rt;
     // configure your runtime build environment
     rt.setIncludePath({ "/path/to/src/qicruntime" });
+    rt.setQmake("/path/to/qt/version/platform/bin/qmake");
 
     const char src[] = "#include <qicentry.h>\n"
                        "#include <stdio.h>\n"
@@ -61,8 +62,8 @@ code this way.
 
 ``` c++
 class AppModel {
-    // actually defined in a common header or library for both
-    // the host application and the runtime-compiled code
+    // actually defined somewhere in a common header or shared library for both
+    // the host program and the runtime-compiled code
 };
 
 int main()
@@ -70,13 +71,13 @@ int main()
     AppModel model;
 
     qicRuntime rt;
-    rt.setCtxVar(&model, "model", nullptr);
+    rt.ctx()->set(&model, "model");
 
     rt.exec(...);
 }
 ```
 
-Then, in the runtime code, access the *context variable* via the `qicContext`.
+In the runtime code, access the *context variable* via the `qicContext`.
 
 ``` c++
 #include <AppModel.h> // possibly also link AppModel.lib/.dll
@@ -92,35 +93,62 @@ For more examples, see the code in the [examples](src/examples/) directory.
 
 ## Design
 
-The principle of this library is very simple, no magic, no special tricks. The
-code is compiled into a shared library (.dll) and loaded during runtime. The
-only requirement is that the library exports a well defined symbol `qic_entry`.
-This is the entry point called by the runtime component.
+The principle behind this library is very simple, no magic, no special tricks.
+Conceptually, the process is similar to how plugin systems work and boils down
+to 4 simple steps.
+
+1. compile user code into a shared object (.dll)
+2. dlopen()
+3. entry_point = dlsym()
+4. call entry_point(app_context)
+
+The purpose of this library is to automate this process in a simple and
+portable manner so that from the user's perspective this is a simple one-liner:
 
 ``` c++
-extern "C" void qic_runtime(qicContext *ctx);
+//qicRuntime rt;
+rt.exec(source_code);
 ```
 
-A very simple interface is used to exchange `void*` pointers to arbitrary data
-between the host application and the loaded library. This is most flexible, as
-the user is free to use whatever techique to exchange data and interact with
-the runtime-compiled code:
+To compile the runtime code, we make use of Qt's own build system `qmake`
+and leverage its natural cross-platform capability.
+
+There are no restrictions on what can or cannot go into the runtime-compiled
+source code. The only requirement is that the user code exports one C-style
+function that serves as the main entry point:
+
+``` c++
+extern "C" void qic_entry(qicContext *ctx);
+```
+
+The `qicContext` is a simple interface for exchange of `void*` pointers to
+arbitrary data between the host program and the runtime code. This is most
+flexible, as the user is free to use any techique for data exchange and
+interaction:
 
 - pointers to POD structures,
 - C function pointers, callbacks,
 - virtual base interfaces,
-- full C++ classes in common shared libraries.
+- full C++ classes in common shared libraries,
+- or even build a complex data persistence mechanism on top of this.
 
-To compile the runtime-compiled code, we make use of the Qt build system `qmake`
-and leverage its natural cross-platform capability.
+## Gotchas and Limitations
 
-Here's what happens internally every time `rt.exec()` is called:
+1. Using this approach, you can run arbitrary code and freely manipulate the
+   host program runtime data. However, you cannot change the structure of the
+   running program. In other words, the binary code of the host program is
+   never altered.
 
-1. A Qt shared library project is generated in a temporary directory, using the
-source code that was passed to `exec()`.
-2. `qmake` is invoked to generate a `Makefile`.
-3. `make` is invoked to build the library.
-4. The generated shared library is loaded.
-5. The symbol `qic_entry` is resolved and called.
-6. The library remains loaded in the host process for the duration of the
-`qicRuntime` object.
+2. Make sure that both the host program and the runtime code are compiled in
+   a binary compatible manner: using the same toolchain, same build options,
+   and if they share any libraries, be sure that both link the same version
+   of those libraries. Failing to do so is an invitation to undefined behavior
+   and crashes.
+
+3. You need to be aware of object lifetime and ownership when sharing data
+   between the runtime code and the host program. At some point, the libraries
+   that contain the runtime code will be unloaded - their code and data
+   unmapped from the host process address space. If the host program accesses
+   this data or code after it has been unloaded, it will result in a segfault.
+   Typically, a strange crash just before the program exits, is indicative of
+   an object lifetime/ownership issue.
