@@ -19,6 +19,10 @@ Possible uses:
 **Requirements:** Qt 5, native compiler toolchain \
 **Platforms:** Windows, Linux, possibly platforms supported by Qt
 
+## Demo
+
+![demo gif](demo1.gif)
+
 ## Integration
 
 You can either build the `qicruntime.pro` as a library and link to it, or add
