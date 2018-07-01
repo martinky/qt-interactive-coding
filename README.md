@@ -12,12 +12,12 @@ Qt projects.
 
 Possible uses:
 
-- interactive / creative coding / live coding
+- interactive / creative / live coding
 - application scripting
 - hot reloading
 
 **Requirements:** Qt 5, native compiler toolchain \
-**Platforms:** Windows, Linux, possibly platforms supported by Qt
+**Platforms:** Windows, Linux, possibly other platforms supported by Qt
 
 ## Demo
 
@@ -73,6 +73,18 @@ int main()
     rt.setCtxVar(&model, "model", nullptr);
 
     rt.exec(...);
+}
+```
+
+Then, in the runtime code, access the *context variable* via the `qicContext`.
+
+``` c++
+#include <AppModel.h> // possibly also link AppModel.lib/.dll
+
+extern "C" void qic_entry(qicContext *ctx)
+{
+    AppModel *const model = static_cast<AppModel*>(ctx->get("model"));
+    model->... // access or modify data, call methods
 }
 ```
 
