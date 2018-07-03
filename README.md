@@ -6,9 +6,9 @@ License: MIT
 ## Summary
 
 Simple, cross-platform library to automate the process of compilation and
-execution of C++ code from within an application during runtime. Allows to
-use C++ as a scripting language. This library is implemented using Qt and
-therefore is suitable for integrating with Qt projects.
+execution of C++ code from within a running application. Allows to use C++
+as a scripting language. This library is implemented using Qt and therefore
+is suitable for integrating with Qt projects.
 
 Possible uses:
 
@@ -16,7 +16,7 @@ Possible uses:
 - application scripting
 - hot reloading
 
-**Requirements:** Qt 5, native compiler toolchain \
+**Dependencies:** Qt 5 (libQtCore5, qmake), C++ compiler toolchain \
 **Platforms:** Windows, Linux, possibly other platforms supported by Qt
 
 ## Demo
@@ -25,8 +25,9 @@ Possible uses:
 
 ## Integration
 
-You can either build and link the `qicruntime.pro` as a shared or static
-library, or add it directly into your Qt project by including `qicruntime.pri`.
+The library is one C++ source file and a couple of headers. You can either
+build it as a shared or static library using `qicruntime.pro`, or copy the
+code directly into your Qt project and include `qicruntime.pri`.
 
 ## Usage
 
@@ -45,7 +46,7 @@ int main()
     const char src[] = "#include <qicentry.h>\n"
                        "#include <stdio.h>\n"
                        "extern \"C\" QIC_DLL_EXPORT void qic_entry(qicContext *ctx) {\n"
-                       "    printf("hello runtime!");\n"
+                       "    printf(\"hello runtime!\");\n"
                        "}\n";
 
     rt.exec(src);
@@ -53,6 +54,8 @@ int main()
     return 0;
 }
 ```
+
+For more examples, see the code in the [examples](src/examples/) directory.
 
 ## Interop
 
@@ -62,8 +65,10 @@ code this way.
 
 ``` c++
 class AppModel {
-    // actually defined somewhere in a common header or shared library for both
-    // the host program and the runtime-compiled code
+    // This class represents the data and functionality of our application that
+    // we want to be able to make 'scriptable'. Actually defined somewhere
+    // in a common header or shared library, so it can be included and linked
+    // by both the host program and the runtime-compiled code.
 };
 
 int main()
@@ -80,7 +85,7 @@ int main()
 In the runtime code, access the *context variable* via the `qicContext`.
 
 ``` c++
-#include <AppModel.h> // possibly also link AppModel.lib/.dll
+#include <AppModel.h> // possibly also link with AppModel.lib/.dll
 
 extern "C" void qic_entry(qicContext *ctx)
 {
@@ -88,8 +93,6 @@ extern "C" void qic_entry(qicContext *ctx)
     model->... // access or modify data, call methods
 }
 ```
-
-For more examples, see the code in the [examples](src/examples/) directory.
 
 ## Design
 
@@ -110,12 +113,12 @@ portable manner so that from the user's perspective this is a simple one-liner:
 rt.exec(source_code);
 ```
 
-To compile the runtime code, we make use of Qt's own build system `qmake`
-and leverage its natural cross-platform capability.
+To compile the runtime code, we make use of Qt's own build system `qmake` and
+leverage its natural cross-platform capability.
 
 There are no restrictions on what can or cannot go into the runtime-compiled
-source code. The only requirement is that the user code exports one C-style
-function that serves as the main entry point:
+source code. The only requirement is that the code exports one C-style function
+that serves as the main entry point:
 
 ``` c++
 extern "C" void qic_entry(qicContext *ctx);
@@ -130,25 +133,40 @@ interaction:
 - C function pointers, callbacks,
 - virtual base interfaces,
 - full C++ classes in common shared libraries,
-- or even build a complex data persistence mechanism on top of this.
+- or whatever data persistence mechanism the user comes up with.
 
-## Gotchas and Limitations
+## Things to Keep in Mind
 
-1. Using this approach, you can run arbitrary code and freely manipulate the
-   host program runtime data. However, you cannot change the structure of the
-   running program. In other words, the binary code of the host program is
-   never altered.
+The mechanism of this library is similar to plugin systems and share the same
+set of behaviors the user should be aware of:
 
-2. Make sure that both the host program and the runtime code are compiled in
+1. We are loading and executing unsafe, untested, native code. There are
+   a million ways how to shoot yourself in the foot with this. Let’s just
+   accept that we can bring the host program down any time. This technique
+   is intended for development only. It should not be used in production or
+   situations where you can’t afford to lose data.
+2. Make sure that both the host program and the script code are compiled in
    a binary compatible manner: using the same toolchain, same build options,
    and if they share any libraries, be sure that both link the same version
    of those libraries. Failing to do so is an invitation to undefined behavior
    and crashes.
-
 3. You need to be aware of object lifetime and ownership when sharing data
-   between the runtime code and the host program. At some point, the libraries
-   that contain the runtime code will be unloaded - their code and data
-   unmapped from the host process address space. If the host program accesses
-   this data or code after it has been unloaded, it will result in a segfault.
-   Typically, a strange crash just before the program exits, is indicative of
-   an object lifetime/ownership issue.
+   between the host program and a script. At some point, the library that
+   contain a script code will be unloaded – its code and data unmapped from
+   the host process address space. If the host program accesses this data or
+   code after it has been unloaded, it will result in a segfault. Typically,
+   a strange crash just before the program exits is indicative of an object
+   lifetime issue.
+
+## Resources
+
+Blog:
+
+- https://blog.kutny.net/2018/07/02/my-take-on-run-time-compiled-c/
+
+Inspiration:
+
+1. https://blog.molecular-matters.com/2014/05/10/using-runtime-compiled-c-code-as-a-scripting-language-under-the-hood/
+2. https://github.com/RuntimeCompiledCPlusPlus/RuntimeCompiledCPlusPlus/wiki
+3. http://ourmachinery.com/post/dll-hot-reloading-in-theory-and-practice/
+4. http://onqtam.com/programming/2018-02-12-read-compile-run-loop-a-tiny-repl-for-cpp/

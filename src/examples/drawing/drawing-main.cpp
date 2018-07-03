@@ -6,8 +6,6 @@
 #include <qicruntime.h>
 #include <qiccontext.h>
 
-#define BASE_DIR "C:/projects/qt-interactive-coding/"
-
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
@@ -16,6 +14,10 @@ int main(int argc, char *argv[])
     // Configure the build environment.
     //
     qicRuntime rt;
+    QString base_dir = "C:/projects/qt-interactive-coding/";
+    rt.setIncludePath({ base_dir + "src/qicruntime",
+                        base_dir + "src/examples/drawing" });
+    // Our script will be using these Qt libraries.
     rt.setQtLibs({ "core", "gui", "widgets" });
 #ifdef QT_DEBUG
     // It is extremely impmortant to ensure that the runtime-compiled code
@@ -23,14 +25,12 @@ int main(int argc, char *argv[])
     // application (i.e. QtCore5.dll vs. QtCore5d.dll).
     rt.setQtConfig({ "debug" });
 #endif
-    rt.setIncludePath({ BASE_DIR "src/qicruntime",
-                        BASE_DIR "src/examples/drawing" });
 
     //
     // We are going to watch this file and recompile and execute it whenever
     // it changes.
     //
-    const QString watched = BASE_DIR "src/examples/drawing/drawing-script.cpp";
+    QString watched = base_dir + "src/examples/drawing/drawing-script.cpp";
 
     //
     // This is our whole GUI application.
@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     label.show();
 
     //
-    // Make this widget available to the runtime-compiled code.
+    // Make the label widget available to the runtime-compiled code.
     //
     rt.ctx()->set(&label, "label");
 

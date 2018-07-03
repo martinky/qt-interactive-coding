@@ -2,14 +2,16 @@
 #include <qicruntime.h>
 #include <qiccontext.h>
 
-#define BASE_DIR "C:/projects/qt-interactive-coding/"
-
 int main()
 {
     //
     // Configure the build environment.
     //
     qicRuntime rt;
+    QString base_dir = "C:/projects/qt-interactive-coding/";
+    rt.setIncludePath({ base_dir + "src/qicruntime" });
+    //rt.setQmake("/path/to/Qt/version/platform/bin/qmake");
+    //rt.loadEnv(base_dir + "env3.txt");
     //rt.setQtLibs({ "core" });
 #ifdef QT_DEBUG
     // It is extremely impmortant to ensure that the runtime-compiled code
@@ -17,8 +19,6 @@ int main()
     // application (i.e. QtCore5.dll vs. QtCore5d.dll).
     rt.setQtConfig({ "debug" });
 #endif
-    rt.setIncludePath({ BASE_DIR "src/qicruntime" });
-    //rt.loadEnv(BASE_DIR "env3.txt");
 
     // Add some context variables.
     int x = 961;
