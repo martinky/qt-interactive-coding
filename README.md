@@ -13,8 +13,8 @@ is suitable for integrating with Qt projects.
 Possible uses:
 
 - interactive / creative / live coding
+- debugging, state inspection
 - application scripting
-- hot reloading
 
 **Dependencies:** Qt 5 (libQtCore5, qmake), C++ compiler toolchain \
 **Platforms:** Windows, Linux, possibly other platforms supported by Qt
@@ -25,9 +25,10 @@ Possible uses:
 
 ## Integration
 
-The library is one C++ source file and a couple of headers. You can either
-build it as a shared or static library using `qicruntime.pro`, or copy the
-code directly into your Qt project and include `qicruntime.pri`.
+The library consists of one C++ source file and a couple of headers. You can
+either build it as a shared or static library using `qicruntime.pro`, or copy
+the [code](src/qicruntime/) directly into your Qt project and include
+`qicruntime.pri`.
 
 ## Usage
 
