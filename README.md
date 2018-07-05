@@ -152,7 +152,7 @@ set of behaviors the user should be aware of:
    and crashes.
 3. You need to be aware of object lifetime and ownership when sharing data
    between the host program and a script. At some point, the library that
-   contain a script code will be unloaded – its code and data unmapped from
+   contains script code will be unloaded – its code and data unmapped from
    the host process address space. If the host program accesses this data or
    code after it has been unloaded, it will result in a segfault. Typically,
    a strange crash just before the program exits is indicative of an object
@@ -162,11 +162,12 @@ set of behaviors the user should be aware of:
 
 Blog:
 
-- https://blog.kutny.net/2018/07/02/my-take-on-run-time-compiled-c/
+- [My Take On Run-time Compiled C++](https://blog.kutny.net/2018/07/02/my-take-on-run-time-compiled-c/)
 
 Inspiration:
 
-1. https://blog.molecular-matters.com/2014/05/10/using-runtime-compiled-c-code-as-a-scripting-language-under-the-hood/
-2. https://github.com/RuntimeCompiledCPlusPlus/RuntimeCompiledCPlusPlus/wiki
-3. http://ourmachinery.com/post/dll-hot-reloading-in-theory-and-practice/
-4. http://onqtam.com/programming/2018-02-12-read-compile-run-loop-a-tiny-repl-for-cpp/
+1. [Using runtime-compiled C++ code as a scripting language: under the hood](https://blog.molecular-matters.com/2014/05/10/using-runtime-compiled-c-code-as-a-scripting-language-under-the-hood/)
+2. [Runtime Compiled C++](https://github.com/RuntimeCompiledCPlusPlus/RuntimeCompiledCPlusPlus)
+3. [DLL Hot Reloading in Theory and Practice](http://ourmachinery.com/post/dll-hot-reloading-in-theory-and-practice/)
+4. [Read-Compile-Run-Loop - a tiny REPL for C++](http://onqtam.com/programming/2018-02-12-read-compile-run-loop-a-tiny-repl-for-cpp/)
+5. [A comprehensive list of projects and resources on runtime compiled C/C++](https://github.com/RuntimeCompiledCPlusPlus/RuntimeCompiledCPlusPlus/wiki/Alternatives) compiled by @dougbinks
