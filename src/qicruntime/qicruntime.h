@@ -35,6 +35,8 @@ class qicRuntimePrivate;
 
 struct qicContext;
 
+class QIODevice;
+
 /**
     \class qicRuntime
     The qicRuntime class provides the runtime build and execution environment.
@@ -64,6 +66,14 @@ struct qicContext;
     Destroys the runtime environment. Destroys all objects registered by the
     runtime-compiled code via qicContext::set() and unloads all libraries in
     reverse order.
+
+    \fn qicRuntime::exec()
+    Compiles and executes the provided C++ code. This method is blocking and
+    returns only after the build process completes and the qic_entry() function
+    returns.
+
+    \fn qicRuntime::execFile()
+    Same as exec() except the source code is read from the \a filename;
 
     \fn qicRuntime::setEnv()
     Sets an environment variable for the build process.
@@ -97,24 +107,26 @@ struct qicContext;
     libraries will be linked with the binary. By default Qt is not linked.
 
     \fn qicRuntime::setQtConfig()
-    Sets the content of the **CONFIG** `qmake` variable. This is used to control
-    build options such as debug/release, rtti, exceptions, etc. If the host
-    application is compiled using `CONFIG=debug`, make sure, the runtime code
-    is also compiled with the same option. Otherwise the host application and
-    the runtime code will be linked with different Qt libraries and different
-    versions of the CRT runtime which will cause unpredictable fatal errors.
+    Sets the content of the **CONFIG** `qmake` variable. This is used to
+    control build options such as debug/release, rtti, exceptions, etc. If the
+    host application is compiled using `CONFIG=debug`, make sure, the runtime
+    code is also compiled with the same option. Otherwise the host application
+    and the runtime code will be linked with different Qt libraries and
+    different versions of the CRT runtime which will cause unpredictable fatal
+    errors.
+
+    \fn qicRuntime::setOutputSink()
+    Directs the output of the build process to the given \a device. This can be
+    used to record the output and display it through a GUI, for example. To
+    completely discard the output, set this to `nullptr`.
+
+    \fn qicRuntime::setOutputSinkToStdOut()
+    Directs the output of the build process to the standard output. This is the
+    default behavior.
 
     \fn qicRuntime::ctx()
     Returns pointer to qicContext that can be used to share data with the
     runtime code.
-
-    \fn qicRuntime::exec()
-    Compiles and executes the provided C++ code. This method is blocking and
-    returns only after the build process completes and the qic_entry() function
-    returns.
-
-    \fn qicRuntime::execFile()
-    Same as exec() except the source code is read from the \a filename;
  */
 class QIC_EXPORT qicRuntime
 {
@@ -129,7 +141,7 @@ public:
 
     void setEnv(QString name, QString value);
     void addEnv(QString name, QString value);
-    void loadEnv(QString path);
+    bool loadEnv(QString path);
     void setQmake(QString path);
     void setMake(QString path);
     void setDefines(QStringList defines);
@@ -137,6 +149,9 @@ public:
     void setLibs(QStringList libs);
     void setQtLibs(QStringList qtlibs);
     void setQtConfig(QStringList qtconf);
+
+    void setOutputSink(QIODevice *device);
+    void setOutputSinkToStdOut();
 
     qicContext *ctx();
 

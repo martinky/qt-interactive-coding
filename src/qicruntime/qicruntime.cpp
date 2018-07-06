@@ -123,6 +123,9 @@ public:
 
     qicContextImpl ctx;
 
+    QIODevice *output_sink = nullptr;
+    QFile fstdout;
+
     qicRuntimePrivate()
     {
         env = QProcessEnvironment::systemEnvironment();
@@ -133,16 +136,31 @@ public:
 #else
         make = "make";
 #endif
+
+        fstdout.open(stdout, QIODevice::WriteOnly|QIODevice::Unbuffered);
+        output_sink = &fstdout;
     }
 
-    void loadEnv(QString path)
+    void output(const char *fmt, ...)
+    {
+        char buff[1024];
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(buff, 1024, fmt, args);
+        va_end(args);
+        if (output_sink) {
+            QTextStream t(output_sink);
+            t << buff << endl;
+        }
+    }
+
+    bool loadEnv(QString path)
     {
         //env.clear();
 
         QFile f(path);
         if (!f.open(QIODevice::ReadOnly)) {
-            qWarning("qicRuntime: Failed to read env file %s.", qPrintable(path));
-            return;
+            return false;
         }
 
         while (!f.atEnd()) {
@@ -153,6 +171,34 @@ public:
             QString value = line.mid(eq+1);
             env.insert(name, value);
         }
+
+        return true;
+    }
+
+    void sinkProcessOutput(QByteArray name, QProcess *proc)
+    {
+        while (proc->bytesAvailable() > 0) {
+            const QByteArray line = proc->readLine();
+            if (output_sink) {
+                output_sink->write(name + line);
+            } // otherwise just discard process output
+        }
+    }
+
+    bool runProcess(QByteArray name, QString program, QStringList arguments = QStringList())
+    {
+        QProcess proc;
+        proc.setWorkingDirectory(dir.path());
+        proc.setProcessEnvironment(env);
+        proc.setProcessChannelMode(QProcess::MergedChannels);
+        QObject::connect(&proc, &QProcess::readyRead, [&]{
+            sinkProcessOutput(name, &proc);
+        });
+        proc.start(program, arguments);
+        proc.waitForFinished();
+        return proc.exitStatus() == QProcess::NormalExit &&
+               proc.state()      == QProcess::NotRunning &&
+               proc.exitCode()   == 0;
     }
 
     QString getLibPath() const
@@ -196,7 +242,7 @@ bool qicRuntime::exec(QString source)
     QString lib_path = p->getLibPath();
     QLibrary *lib = new QLibrary(lib_path);
     if (!lib->load()) {
-        qWarning("qicRuntime: Failed to load library %s: %s", qPrintable(lib_path), qPrintable(lib->errorString()));
+        p->output("qicRuntime: Failed to load library %s: %s", qPrintable(lib_path), qPrintable(lib->errorString()));
         delete lib;
         return false;
     }
@@ -206,7 +252,7 @@ bool qicRuntime::exec(QString source)
     typedef void (*qic_entry_f)(qicContext *);
     qic_entry_f qic_entry = (qic_entry_f) lib->resolve("qic_entry");
     if (!qic_entry) {
-        qWarning("qicRuntime: Failed to resolve qic_entry: %s", qPrintable(lib->errorString()));
+        p->output("qicRuntime: Failed to resolve qic_entry: %s", qPrintable(lib->errorString()));
         lib->unload();
         delete lib;
         return false;
@@ -229,7 +275,7 @@ bool qicRuntime::execFile(QString filename)
 {
     QFile f(filename);
     if (!f.open(QIODevice::ReadOnly)) {
-        qWarning("qicRuntime: Failed to open source file: %s", qPrintable(filename));
+        p->output("qicRuntime: Failed to open source file: %s", qPrintable(filename));
         return false;
     }
     QTextStream t(&f);
@@ -251,9 +297,9 @@ void qicRuntime::addEnv(QString name, QString value)
     p->env.insert(name, value);
 }
 
-void qicRuntime::loadEnv(QString path)
+bool qicRuntime::loadEnv(QString path)
 {
-    p->loadEnv(path);
+    return p->loadEnv(path);
 }
 
 void qicRuntime::setQmake(QString path)
@@ -291,6 +337,16 @@ void qicRuntime::setQtConfig(QStringList qtconf)
     p->qtconf = qtconf;
 }
 
+void qicRuntime::setOutputSink(QIODevice *device)
+{
+    p->output_sink = device;
+}
+
+void qicRuntime::setOutputSinkToStdOut()
+{
+    p->output_sink = &p->fstdout;
+}
+
 qicContext *qicRuntime::ctx()
 {
     return &p->ctx;
@@ -302,7 +358,7 @@ bool qicRuntime::compile(QString src)
     timer.start();
 
     if (!p->dir.isValid()) {
-        qWarning("qicRuntime: Failed to create temp directory.");
+        p->output("qicRuntime: Failed to create temp directory.");
         return false;
     }
 
@@ -311,7 +367,7 @@ bool qicRuntime::compile(QString src)
     QString fncpp = QString("a%1.cpp").arg(seq);
     QFile fcpp(p->dir.filePath(fncpp));
     if (!fcpp.open(QIODevice::WriteOnly)) {
-        qWarning("qicRuntime: Failed to create temp source file.");
+        p->output("qicRuntime: Failed to create temp source file.");
         return false;
     }
     {
@@ -323,7 +379,7 @@ bool qicRuntime::compile(QString src)
     QString fnpro = QString("a%1.pro").arg(seq);
     QFile fpro(p->dir.filePath(fnpro));
     if (!fpro.open(QIODevice::WriteOnly)) {
-        qWarning("qicRuntime: Failed to create temp project file.");
+        p->output("qicRuntime: Failed to create temp project file.");
         return false;
     }
     {
@@ -346,41 +402,19 @@ bool qicRuntime::compile(QString src)
 
 //    for (QString k : p->env.keys()) {
 //        QString v = p->env.value(k);
-//        qDebug("[env]   %s=%s", qPrintable(k), qPrintable(v));
+//        p->output("[env]   %s=%s", qPrintable(k), qPrintable(v));
 //    }
 
-    QProcess pqmake;
-    pqmake.setWorkingDirectory(p->dir.path());
-    pqmake.setProcessEnvironment(p->env);
-    pqmake.start(p->qmake, { fnpro });
-    pqmake.waitForFinished();
-    while (!pqmake.atEnd()) {
-        QByteArray s = pqmake.readLine().trimmed();
-        qDebug("[qmake] %s", qPrintable(s));
-    }
-    if (    !pqmake.exitStatus() == QProcess::NormalExit ||
-            !pqmake.state() == QProcess::NotRunning ||
-            !pqmake.exitCode() == 0) {
-        qWarning("qicRuntime: Failed to generate Makefile.");
+    if (!p->runProcess("[qmake] ", p->qmake, { fnpro })) {
+        p->output("qicRuntime: Failed to generate Makefile.");
         return false;
     }
 
-    QProcess pmake;
-    pmake.setWorkingDirectory(p->dir.path());
-    pmake.setProcessEnvironment(p->env);
-    pmake.start(p->make);
-    pmake.waitForFinished();
-    while (!pmake.atEnd()) {
-        QByteArray s = pmake.readLine().trimmed();
-        qDebug("[make]  %s", qPrintable(s));
-    }
-    if (    !pmake.exitStatus() == QProcess::NormalExit ||
-            !pmake.state() == QProcess::NotRunning ||
-            !pmake.exitCode() == 0) {
-        qWarning("qicRuntime: Build failed.");
+    if (!p->runProcess("[make]  ", p->make)) {
+        p->output("qicRuntime: Build failed.");
         return false;
     }
 
-    qDebug("qicRuntime: Build finished in %g seconds.", (timer.elapsed() / 1000.0));
+    p->output("qicRuntime: Build finished in %g seconds.", (timer.elapsed() / 1000.0));
     return true;
 }
