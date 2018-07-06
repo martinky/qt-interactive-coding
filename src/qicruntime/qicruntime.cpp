@@ -160,7 +160,7 @@ public:
 #ifdef Q_OS_WIN
         QString libn = qtconf.contains("debug") ? "debug/a%1.dll" : "release/a%1.dll";
 #else
-        QString libn = "liba%1.so";
+        QString libn = "a%1";
 #endif
         return dir.filePath(libn.arg(seq()));
     }
