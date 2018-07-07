@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
         // Small workaround, because some editors save files in a "weird" way
         // that actually deletes and replaces the file and this confuses the
         // QFileSystemWatcher, which stops watching for subsequent changes.
-        QThread::msleep(100);
+        QThread::msleep(250);
         watcher.addPath(watched);
 
         rt.execFile(watched);
