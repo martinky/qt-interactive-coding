@@ -26,7 +26,7 @@ int main()
 
     QString boilerplate = "#include <qicentry.h>\n"
                           "#include <qiccontext.h>\n"
-                          "extern \"C\" QIC_DLL_EXPORT void qic_entry(qicContext *ctx) {\n"
+                          "extern \"C\" QIC_ENTRY_EXPORT void qic_entry(qicContext *ctx) {\n"
                           "    %CODE%\n"
                           "}\n";
     QString code;

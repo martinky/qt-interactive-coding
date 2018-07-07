@@ -24,9 +24,9 @@ SOFTWARE.
 #define QICENTRY_H
 
 #ifdef _MSC_VER
-#define QIC_DLL_EXPORT __declspec(dllexport)
+#define QIC_ENTRY_EXPORT __declspec(dllexport)
 #else
-#define QIC_DLL_EXPORT
+#define QIC_ENTRY_EXPORT
 #endif
 
 struct qicContext;
@@ -40,6 +40,6 @@ struct qicContext;
 
         extern "C" void qic_entry(qicContext *ctx);
  */
-extern "C" QIC_DLL_EXPORT void qic_entry(qicContext *ctx);
+extern "C" QIC_ENTRY_EXPORT void qic_entry(qicContext *ctx);
 
 #endif // QICENTRY_H

@@ -25,10 +25,14 @@ SOFTWARE.
 
 #include <QString>
 
-#if defined QIC_DLL
-#define QIC_EXPORT Q_DECL_EXPORT
+#ifdef QIC_STATIC
+#       define QIC_EXPORT
 #else
-#define QIC_EXPORT Q_DECL_IMPORT
+#   if defined QIC_DLL
+#       define QIC_EXPORT Q_DECL_EXPORT
+#   else
+#       define QIC_EXPORT Q_DECL_IMPORT
+#   endif
 #endif
 
 class qicRuntimePrivate;

@@ -23,7 +23,7 @@ QImage paint()
     return img;
 }
 
-extern "C" QIC_DLL_EXPORT void qic_entry(qicContext *ctx)
+extern "C" QIC_ENTRY_EXPORT void qic_entry(qicContext *ctx)
 {
     //
     // Get the application widget and paint something on it.

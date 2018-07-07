@@ -46,7 +46,7 @@ int main()
 
     const char src[] = "#include <qicentry.h>\n"
                        "#include <stdio.h>\n"
-                       "extern \"C\" QIC_DLL_EXPORT void qic_entry(qicContext *ctx) {\n"
+                       "extern \"C\" QIC_ENTRY_EXPORT void qic_entry(qicContext *ctx) {\n"
                        "    printf(\"hello runtime!\");\n"
                        "}\n";
 
