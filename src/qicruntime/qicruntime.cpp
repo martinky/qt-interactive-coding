@@ -103,7 +103,7 @@ struct qicContextImpl : public qicContext
         va_start(args, fmt);
         vsnprintf(buff, 1024, fmt, args);
         va_end(args);
-        qDebug(buff);
+        qDebug("%s", buff);
     }
 };
 
