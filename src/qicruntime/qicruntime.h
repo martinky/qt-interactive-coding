@@ -119,12 +119,12 @@ class QIODevice;
     different versions of the CRT runtime which will cause unpredictable fatal
     errors.
 
-    \fn qicRuntime::setOutputSink()
+    \fn qicRuntime::setOutputTo()
     Directs the output of the build process to the given \a device. This can be
     used to record the output and display it through a GUI, for example. To
     completely discard the output, set this to `nullptr`.
 
-    \fn qicRuntime::setOutputSinkToStdOut()
+    \fn qicRuntime::setOutputToStdOut()
     Directs the output of the build process to the standard output. This is the
     default behavior.
 
@@ -154,8 +154,8 @@ public:
     void setQtLibs(QStringList qtlibs);
     void setQtConfig(QStringList qtconf);
 
-    void setOutputSink(QIODevice *device);
-    void setOutputSinkToStdOut();
+    void setOutputTo(QIODevice *device);
+    void setOutputToStdOut();
 
     qicContext *ctx();
 

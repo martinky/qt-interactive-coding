@@ -337,12 +337,12 @@ void qicRuntime::setQtConfig(QStringList qtconf)
     p->qtconf = qtconf;
 }
 
-void qicRuntime::setOutputSink(QIODevice *device)
+void qicRuntime::setOutputTo(QIODevice *device)
 {
     p->output_sink = device;
 }
 
-void qicRuntime::setOutputSinkToStdOut()
+void qicRuntime::setOutputToStdOut()
 {
     p->output_sink = &p->fstdout;
 }
