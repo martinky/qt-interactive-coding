@@ -22,6 +22,7 @@ SOFTWARE. */
 #define QICRUNTIME_H
 
 #include <QString>
+#include <QStringList>
 
 #ifdef QIC_STATIC
 #       define QIC_EXPORT
