@@ -90,7 +90,7 @@ struct qicContextImpl : public qicContext
     void *set(void *ptr, const char *name, void(*deleter)(void*)) override
     {
         Q_ASSERT(frames.empty() == false);
-        frames.back().vars.push_back({ ptr, ::strdup(name), deleter });
+        frames.back().vars.push_back({ ptr, ::_strdup(name), deleter });
         return ptr;
     }
 
@@ -147,6 +147,7 @@ public:
         vsnprintf(buff, 1024, fmt, args);
         va_end(args);
         if (output_sink) {
+            using Qt::endl;
             QTextStream t(output_sink);
             t << buff << endl;
         }
@@ -381,6 +382,7 @@ bool qicRuntime::compile(QString src)
         return false;
     }
     {
+        using Qt::endl;
         QTextStream tpro(&fpro);
         tpro << "TEMPLATE = lib" << endl;
         tpro << "QT = " << p->qtlibs.join(QChar(' ')) << endl;

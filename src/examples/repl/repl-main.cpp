@@ -34,7 +34,7 @@ int main()
     QTextStream out(stdout);
     QTextStream in(stdin);
 
-    out << "REPL: Type C++ code here, then type 'go' to compile and run, or 'quit' to exit." << endl;
+    out << "REPL: Type C++ code here, then type 'go' to compile and run, or 'quit' to exit." << Qt::endl;
 
     //
     // REPL - Well, not exactly a REPL, rather a Read-Compile-Execute-Loop.
