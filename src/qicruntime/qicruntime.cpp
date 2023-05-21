@@ -24,6 +24,8 @@ SOFTWARE. */
 #include <QElapsedTimer>
 #include <QLibrary>
 #include <QProcess>
+#include <QThread>
+#include <QFileSystemWatcher>
 #include "qicruntime.h"
 #include "qiccontext.h"
 
@@ -48,6 +50,9 @@ struct qicContextImpl : public qicContext
     // runtime-compiled code and any variables this code may have registered.
     std::vector<qicFrame> frames;
 
+    // Unload libs in destructor.
+    bool unloadLibs = true;
+
     qicContextImpl()
     {
         // push one empty frame to hold user defined global variables
@@ -66,7 +71,9 @@ struct qicContextImpl : public qicContext
                 }
             }
             if (fit->lib) {
-                fit->lib->unload();
+                if (unloadLibs) {
+                    fit->lib->unload();
+                }
                 delete fit->lib;
             }
         }
@@ -118,11 +125,12 @@ public:
     QStringList qtlibs;         // QT
     QStringList qtconf;         // CONFIG
     QStringList libs;           // LIBS
+    // additional flags
+    bool autodebug = true;      // add "debug" to CONFIG automatically
+
+    QFileSystemWatcher *watcher = nullptr;
 
     qicContextImpl ctx;
-
-    QIODevice *output_sink = nullptr;
-    QFile fstdout;
 
     qicRuntimePrivate()
     {
@@ -134,23 +142,6 @@ public:
 #else
         make = "make";
 #endif
-
-        fstdout.open(stdout, QIODevice::WriteOnly|QIODevice::Unbuffered);
-        output_sink = &fstdout;
-    }
-
-    void output(const char *fmt, ...)
-    {
-        char buff[1024];
-        va_list args;
-        va_start(args, fmt);
-        vsnprintf(buff, 1024, fmt, args);
-        va_end(args);
-        if (output_sink) {
-            using Qt::endl;
-            QTextStream t(output_sink);
-            t << buff << endl;
-        }
     }
 
     bool loadEnv(QString path)
@@ -174,25 +165,14 @@ public:
         return true;
     }
 
-    void sinkProcessOutput(QByteArray name, QProcess *proc)
+    bool runProcess(QString fnlog, QString program, QStringList arguments = QStringList())
     {
-        while (proc->bytesAvailable() > 0) {
-            const QByteArray line = proc->readLine();
-            if (output_sink) {
-                output_sink->write(name + line);
-            } // otherwise just discard process output
-        }
-    }
-
-    bool runProcess(QByteArray name, QString program, QStringList arguments = QStringList())
-    {
+        QString fplog = dir.filePath(fnlog);
         QProcess proc;
         proc.setWorkingDirectory(dir.path());
         proc.setProcessEnvironment(env);
         proc.setProcessChannelMode(QProcess::MergedChannels);
-        QObject::connect(&proc, &QProcess::readyRead, [&]{
-            sinkProcessOutput(name, &proc);
-        });
+        proc.setStandardOutputFile(fplog, QProcess::Append);
         proc.start(program, arguments);
         proc.waitForFinished();
         return proc.exitStatus() == QProcess::NormalExit &&
@@ -203,9 +183,9 @@ public:
     QString getLibPath() const
     {
 #ifdef Q_OS_WIN
-        QString libn = qtconf.contains("debug") ? "debug/a%1.dll" : "release/a%1.dll";
+        QString libn = "bin/a%1.dll";
 #else
-        QString libn = "a%1";
+        QString libn = "bin/a%1";
 #endif
         return dir.filePath(libn.arg(seq()));
     }
@@ -218,7 +198,7 @@ public:
 
 
 
-qicRuntime::qicRuntime() :
+qicRuntime::qicRuntime(QObject *parent) : QObject(parent),
     p(new qicRuntimePrivate)
 {
 }
@@ -226,6 +206,11 @@ qicRuntime::qicRuntime() :
 qicRuntime::~qicRuntime()
 {
     delete p;
+}
+
+void qicRuntime::setTempDir(QString path)
+{
+    p->dir = QTemporaryDir(path);
 }
 
 bool qicRuntime::exec(QString source)
@@ -241,7 +226,7 @@ bool qicRuntime::exec(QString source)
     QString lib_path = p->getLibPath();
     QLibrary *lib = new QLibrary(lib_path);
     if (!lib->load()) {
-        p->output("qicRuntime: Failed to load library %s: %s", qPrintable(lib_path), qPrintable(lib->errorString()));
+        qWarning("qicRuntime: Failed to load library %s: %s", qPrintable(lib_path), qPrintable(lib->errorString()));
         delete lib;
         return false;
     }
@@ -251,7 +236,7 @@ bool qicRuntime::exec(QString source)
     typedef void (*qic_entry_f)(qicContext *);
     qic_entry_f qic_entry = (qic_entry_f) lib->resolve("qic_entry");
     if (!qic_entry) {
-        p->output("qicRuntime: Failed to resolve qic_entry: %s", qPrintable(lib->errorString()));
+        qWarning("qicRuntime: Failed to resolve qic_entry: %s", qPrintable(lib->errorString()));
         lib->unload();
         delete lib;
         return false;
@@ -274,11 +259,41 @@ bool qicRuntime::execFile(QString filename)
 {
     QFile f(filename);
     if (!f.open(QIODevice::ReadOnly)) {
-        p->output("qicRuntime: Failed to open source file: %s", qPrintable(filename));
+        qWarning("qicRuntime: Failed to open source file: %s", qPrintable(filename));
         return false;
     }
     QTextStream t(&f);
     return exec(t.readAll());
+}
+
+bool qicRuntime::watchExecFile(QString filename, bool execNow)
+{
+    QFileInfo file(filename);
+    if (!file.exists()) return false;
+
+    QString absfn = file.canonicalFilePath();
+    if (absfn.isEmpty()) return false;
+
+    if (p->watcher == nullptr) {
+        p->watcher = new QFileSystemWatcher(this);
+        QObject::connect(p->watcher, &QFileSystemWatcher::fileChanged, this, [=](const QString &path){
+            // Small workaround, because some editors save files in a "weird" way
+            // that actually deletes and replaces the file and this confuses the
+            // QFileSystemWatcher, which stops watching for subsequent changes.
+            QThread::msleep(250);
+            p->watcher->addPath(path);
+
+            execFile(path);
+        });
+    }
+
+    if (!p->watcher->addPath(absfn)) return false;
+
+    if (execNow) {
+        return execFile(absfn);
+    }
+
+    return true;
 }
 
 void qicRuntime::setEnv(QString name, QString value)
@@ -321,6 +336,15 @@ void qicRuntime::setIncludePath(QStringList dirs)
     p->include_path = dirs;
 }
 
+void qicRuntime::setIncludeDirs(QList<QDir> dirs)
+{
+    QStringList paths;
+    for (const QDir &d : dirs) {
+        paths += d.canonicalPath();
+    }
+    setIncludePath(paths);
+}
+
 void qicRuntime::setLibs(QStringList libs)
 {
     p->libs = libs;
@@ -336,14 +360,14 @@ void qicRuntime::setQtConfig(QStringList qtconf)
     p->qtconf = qtconf;
 }
 
-void qicRuntime::setOutputTo(QIODevice *device)
+void qicRuntime::setAutoDebug(bool enable)
 {
-    p->output_sink = device;
+    p->autodebug = enable;
 }
 
-void qicRuntime::setOutputToStdOut()
+void qicRuntime::setUnloadLibs(bool unload)
 {
-    p->output_sink = &p->fstdout;
+    p->ctx.unloadLibs = unload;
 }
 
 qicContext *qicRuntime::ctx()
@@ -357,7 +381,7 @@ bool qicRuntime::compile(QString src)
     timer.start();
 
     if (!p->dir.isValid()) {
-        p->output("qicRuntime: Failed to create temp directory.");
+        qWarning("qicRuntime: Failed to create temp directory.");
         return false;
     }
 
@@ -366,7 +390,7 @@ bool qicRuntime::compile(QString src)
     QString fncpp = QString("a%1.cpp").arg(seq);
     QFile fcpp(p->dir.filePath(fncpp));
     if (!fcpp.open(QIODevice::WriteOnly)) {
-        p->output("qicRuntime: Failed to create temp source file.");
+        qWarning("qicRuntime: Failed to create temp source file.");
         return false;
     }
     {
@@ -375,10 +399,11 @@ bool qicRuntime::compile(QString src)
     }
     fcpp.close();
 
+    QString fnlog = QString("a%1.log").arg(seq);
     QString fnpro = QString("a%1.pro").arg(seq);
     QFile fpro(p->dir.filePath(fnpro));
     if (!fpro.open(QIODevice::WriteOnly)) {
-        p->output("qicRuntime: Failed to create temp project file.");
+        qWarning("qicRuntime: Failed to create temp project file.");
         return false;
     }
     {
@@ -387,14 +412,20 @@ bool qicRuntime::compile(QString src)
         tpro << "TEMPLATE = lib" << endl;
         tpro << "QT = " << p->qtlibs.join(QChar(' ')) << endl;
         tpro << "CONFIG += " << p->qtconf.join(QChar(' ')) << endl;
+#ifdef QT_DEBUG
+        if (p->autodebug) {
+            tpro << "CONFIG += debug" << endl;
+        }
+#endif
+        tpro << "DESTDIR = bin" << endl;
         tpro << "SOURCES = " << fncpp << endl;
-        for (QString def: p->defines) {
+        for (const QString &def: p->defines) {
             tpro << "DEFINES += " << def << endl;
         }
-        for (QString inc : p->include_path) {
+        for (const QString &inc : p->include_path) {
             tpro << "INCLUDEPATH += " << inc << endl;
         }
-        for (QString lib : p->libs) {
+        for (const QString &lib : p->libs) {
             tpro << "LIBS += " << lib << endl;
         }
     }
@@ -402,19 +433,19 @@ bool qicRuntime::compile(QString src)
 
 //    for (QString k : p->env.keys()) {
 //        QString v = p->env.value(k);
-//        p->output("[env]   %s=%s", qPrintable(k), qPrintable(v));
+//        qDebug("[env]   %s=%s", qPrintable(k), qPrintable(v));
 //    }
 
-    if (!p->runProcess("[qmake] ", p->qmake, { fnpro })) {
-        p->output("qicRuntime: Failed to generate Makefile.");
+    if (!p->runProcess(fnlog, p->qmake, { fnpro })) {
+        qWarning("qicRuntime: Failed to generate Makefile. See log: %s", qPrintable(fnlog));
         return false;
     }
 
-    if (!p->runProcess("[make]  ", p->make)) {
-        p->output("qicRuntime: Build failed.");
+    if (!p->runProcess(fnlog, p->make)) {
+        qWarning("qicRuntime: Build failed. See log: %s", qPrintable(fnlog));
         return false;
     }
 
-    p->output("qicRuntime: Build finished in %g seconds.", (timer.elapsed() / 1000.0));
+    qDebug("qicRuntime: Build finished in %g seconds.", (timer.elapsed() / 1000.0));
     return true;
 }

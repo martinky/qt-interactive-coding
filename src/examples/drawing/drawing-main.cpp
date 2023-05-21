@@ -12,6 +12,7 @@ int main(int argc, char *argv[])
 
     //
     // Configure the build environment.
+    // Change your base_dir as needed.
     //
     qicRuntime rt;
     QString base_dir = "C:/projects/qt-interactive-coding/";
@@ -19,12 +20,6 @@ int main(int argc, char *argv[])
                         base_dir + "src/examples/drawing" });
     // Our script will be using these Qt libraries.
     rt.setQtLibs({ "core", "gui", "widgets" });
-#ifdef QT_DEBUG
-    // It is extremely impmortant to ensure that the runtime-compiled code
-    // links with the same version of Qt libraries and CRT library as the host
-    // application (i.e. QtCore5.dll vs. QtCore5d.dll).
-    rt.setQtConfig({ "debug" });
-#endif
 
     //
     // We are going to watch this file and recompile and execute it whenever
@@ -47,20 +42,10 @@ int main(int argc, char *argv[])
     //
     rt.ctx()->set(&label, "label");
 
-    QFileSystemWatcher watcher;
-    watcher.addPath(watched);
-
-    QObject::connect(&watcher, &QFileSystemWatcher::fileChanged, [&](){
-        qDebug("Change detected, going to recompile: %s", qPrintable(watched));
-
-        // Small workaround, because some editors save files in a "weird" way
-        // that actually deletes and replaces the file and this confuses the
-        // QFileSystemWatcher, which stops watching for subsequent changes.
-        QThread::msleep(250);
-        watcher.addPath(watched);
-
-        rt.execFile(watched);
-    });
+    //
+    // Watch our "script" file and recompile and execute when changed.
+    //
+    rt.watchExecFile(watched, false);
 
     return app.exec();
 }

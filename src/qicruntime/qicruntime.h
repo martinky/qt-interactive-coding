@@ -21,6 +21,7 @@ SOFTWARE. */
 #ifndef QICRUNTIME_H
 #define QICRUNTIME_H
 
+#include <QDir>
 #include <QString>
 #include <QStringList>
 
@@ -70,13 +71,21 @@ class QIODevice;
     runtime-compiled code via qicContext::set() and unloads all libraries in
     reverse order.
 
+    \fn qicRuntime::setTempDir()
+    Sets the temporary working directory for the build output, generated
+    intermediate files and log files. The directory is automatically deleted in
+    the destructor. The default temporary directory location is system specific.
+
     \fn qicRuntime::exec()
     Compiles and executes the provided C++ code. This method is blocking and
     returns only after the build process completes and the qic_entry() function
     returns.
 
     \fn qicRuntime::execFile()
-    Same as exec() except the source code is read from the \a filename;
+    Same as exec() except the source code is read from the \a filename.
+
+    \fn qicRuntime::watchExecFile()
+    Watches a file and calls execFile() each time the file is changed.
 
     \fn qicRuntime::setEnv()
     Sets an environment variable for the build process.
@@ -102,6 +111,10 @@ class QIODevice;
     \fn qicRuntime::setIncludePath()
     Sets the content of the **INCLUDEPATH** `qmake` variable.
 
+    \fn qicRuntime::setIncludeDirs()
+    Sets the content of the **INCLUDEPATH** `qmake` variable. Converts QDir
+    to canonical path.
+
     \fn qicRuntime::setLibs()
     Sets the content of the **LIBS** `qmake` variable.
 
@@ -118,29 +131,41 @@ class QIODevice;
     different versions of the CRT runtime which will cause unpredictable fatal
     errors.
 
-    \fn qicRuntime::setOutputTo()
-    Directs the output of the build process to the given \a device. This can be
-    used to record the output and display it through a GUI, for example. To
-    completely discard the output, set this to `nullptr`.
+    \fn qicRuntime::setAutoDebug()
+    Adds the "debug" option to **CONFIG** `qmake` variable automatically if
+    qic Runtime was compiled in debug mode, i.e. `QT_DEBUG` macro was defined.
+    This is enabled by default.
 
-    \fn qicRuntime::setOutputToStdOut()
-    Directs the output of the build process to the standard output. This is the
-    default behavior.
+    \fn qicRuntime::setUnloadLibs()
+    If set to `true`, dynamically loaded libs will be unloaded in the
+    destructor. Otherwise, libs that contain runtime-compiled code will remain
+    loaded until the parent process exits. Not unloading libs may prevent some
+    lifetime errors, e.g. when code mapped to the lib needs to be executed after
+    qicRuntime was destroyed. This happens if objects created from inside the
+    runtime-compiled code outlive the qicRuntime.
+    This is initially set to `true`.
 
     \fn qicRuntime::ctx()
     Returns pointer to qicContext that can be used to share data with the
     runtime code.
  */
-class QIC_EXPORT qicRuntime
+class QIC_EXPORT qicRuntime : public QObject
 {
 public:
-    qicRuntime();
+    qicRuntime(QObject *parent = nullptr);
     ~qicRuntime();
+
+    // properties
+
+    void setTempDir(QString path);
+
+    // compile and execute code
 
     bool exec(QString source);
     bool execFile(QString filename);
+    bool watchExecFile(QString filename, bool execNow = true);
 
-    // build env
+    // build environment
 
     void setEnv(QString name, QString value);
     void addEnv(QString name, QString value);
@@ -149,12 +174,14 @@ public:
     void setMake(QString path);
     void setDefines(QStringList defines);
     void setIncludePath(QStringList dirs);
+    void setIncludeDirs(QList<QDir> dirs);
     void setLibs(QStringList libs);
     void setQtLibs(QStringList qtlibs);
     void setQtConfig(QStringList qtconf);
+    void setAutoDebug(bool enable);
+    void setUnloadLibs(bool unload);
 
-    void setOutputTo(QIODevice *device);
-    void setOutputToStdOut();
+    // runtime env
 
     qicContext *ctx();
 
