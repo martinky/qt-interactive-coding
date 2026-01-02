@@ -276,7 +276,7 @@ bool qicRuntime::watchExecFile(QString filename, bool execNow)
 
     if (p->watcher == nullptr) {
         p->watcher = new QFileSystemWatcher(this);
-        QObject::connect(p->watcher, &QFileSystemWatcher::fileChanged, this, [=](const QString &path){
+        QObject::connect(p->watcher, &QFileSystemWatcher::fileChanged, this, [this](const QString &path){
             // Small workaround, because some editors save files in a "weird" way
             // that actually deletes and replaces the file and this confuses the
             // QFileSystemWatcher, which stops watching for subsequent changes.
