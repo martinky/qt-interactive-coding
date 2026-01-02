@@ -97,7 +97,7 @@ struct qicContextImpl : public qicContext
     void *set(void *ptr, const char *name, void(*deleter)(void*)) override
     {
         Q_ASSERT(frames.empty() == false);
-        frames.back().vars.push_back({ ptr, ::_strdup(name), deleter });
+        frames.back().vars.push_back({ ptr, strdup(name), deleter });
         return ptr;
     }
 
